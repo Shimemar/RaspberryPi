@@ -1,0 +1,32 @@
+# /etc/systemd/system/imx219-uvc.service  (original g_webcam version backed up as
+# /etc/systemd/system/imx219-uvc.service.bak-g_webcam on the Pi)
+[Unit]
+Description=IMX219 NoIR USB UVC Camera (configfs)
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+ConditionPathExists=/sys/class/udc/20980000.usb
+
+[Service]
+Type=simple
+
+# Create the configfs UVC gadget (mode table in the script) and bind it to the UDC
+ExecStartPre=/usr/local/sbin/imx219-uvc-gadget.sh start
+
+# NoIR camera tuning
+Environment=LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json
+# Fixed sensor mode: IMX219 full-FOV 2x2 binned (needs the patched uvc-gadget,
+# raspicam/pi/uvc-gadget-sensor-mode.patch). Remove to let libcamera pick (centre crop).
+Environment=UVC_SENSOR_MODE=1640:1232:10
+
+# Start camera stream (configfs function, not the legacy UDC name)
+ExecStart=/usr/bin/uvc-gadget -c 0 imx219/functions/uvc.0
+ExecStopPost=/usr/local/sbin/imx219-uvc-gadget.sh stop
+
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

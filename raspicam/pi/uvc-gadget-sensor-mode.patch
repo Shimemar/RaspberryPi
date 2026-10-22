@@ -1,0 +1,36 @@
+--- a/lib/libcamera-source.cpp
++++ b/lib/libcamera-source.cpp
+@@ -13,6 +13,7 @@
+ #include <iostream>
+ #include <memory.h>
+ #include <queue>
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <string>
+ #include <string.h>
+@@ -190,7 +191,24 @@
+ 	streamConfig.size.height = fmt->height;
+ 	streamConfig.pixelFormat = PixelFormat(chosen_pixelformat);
+ 
+-	src->config->validate();
++	/*
++	 * Optional fixed sensor mode, e.g. UVC_SENSOR_MODE=1640:1232:10 for the IMX219
++	 * full-FOV 2x2-binned mode. Without it libcamera picks the smallest mode covering
++	 * the output size, which for 640x360 / 640x480 is a centre crop (narrow FOV).
++	 */
++	const char *sensor_mode = getenv("UVC_SENSOR_MODE");
++	unsigned int sm_w, sm_h, sm_bits;
++	if (sensor_mode && sscanf(sensor_mode, "%u:%u:%u", &sm_w, &sm_h, &sm_bits) == 3) {
++		SensorConfiguration sensorConfig;
++		sensorConfig.outputSize = Size(sm_w, sm_h);
++		sensorConfig.bitDepth = sm_bits;
++		src->config->sensorConfig = sensorConfig;
++		std::cout << "sensor mode forced to " << sm_w << "x" << sm_h << " "
++			  << sm_bits << "-bit" << std::endl;
++	}
++
++	if (src->config->validate() == CameraConfiguration::Invalid)
++		std::cerr << "set_format: camera configuration invalid" << std::endl;
+ 
+ #ifdef CONFIG_CAN_ENCODE
+ 	/*
